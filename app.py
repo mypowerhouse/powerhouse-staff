@@ -48,14 +48,16 @@ def check_password():
 check_password()
 
 # ── DB helpers ──────────────────────────────────────────────────────────────────
-def _conn():
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
-
+# Using cursor directly — compatible with pandas 2.x + Python 3.12/3.14
 def _q(sql, params=()):
-    with _conn() as conn:
-        return pd.read_sql_query(sql, conn, params=params)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    try:
+        cursor = conn.execute(sql, params)
+        cols = [d[0] for d in cursor.description]
+        rows = cursor.fetchall()
+        return pd.DataFrame(rows, columns=cols)
+    finally:
+        conn.close()
 
 def get_available_months():
     df = _q("SELECT DISTINCT strftime('%Y-%m', class_date) as m FROM attendance ORDER BY m DESC")
